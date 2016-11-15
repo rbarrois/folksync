@@ -26,7 +26,7 @@ class Replicator:
             }
 
             # Process all keys (local + remote)
-            keys = set(source_data.keys()) + set(sink_data.keys())
+            keys = set(source_data.keys()) | set(sink_data.keys())
 
             for key in keys:
                 source_item = source_data.get(key)
@@ -89,7 +89,7 @@ class Replicator:
                 action=Action.CREATED,
                 handler=sink.create_batch,
                 changes=created,
-                condition=mode in [SyncMode.ADDITIVE, SyncMode.FULL],
+                condition=mode in [ReplicationMode.ADDITIVE, ReplicationMode.FULL],
             )
 
             self._run_step(
@@ -97,15 +97,15 @@ class Replicator:
                 action=Action.UPDATED,
                 handler=sink.update_batch,
                 changes=updated,
-                condition=mode in [SyncMode.ADDITIVE, SyncMode.FULL],
+                condition=mode in [ReplicationMode.ADDITIVE, ReplicationMode.FULL],
             )
 
             self._run_step(
                 sink=sink,
-                action=Action.DELETED
+                action=Action.DELETED,
                 handler=sink.delete_batch,
                 changes=deleted,
-                condition=mode in [SyncMode.FULL],
+                condition=mode in [ReplicationMode.FULL],
             )
 
     def _run_step(self, sink, action, handler, changes, condition):

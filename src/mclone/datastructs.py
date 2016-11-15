@@ -42,5 +42,5 @@ class ReplicationStepState(enum.Enum):
 #:     and keep context; None for a deletion.
 Change = collections.namedtuple(
     'Change',
-    ['action', 'key', 'source', 'target', 'sink', 'delta'],
+    ['action', 'key', 'previous', 'target', 'sink', 'delta'],
 )
