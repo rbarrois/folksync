@@ -14,8 +14,18 @@ root_dir = os.path.abspath(os.path.dirname(__file__))
 
 
 def get_version():
-    from mclone import version
-    return version.__version__
+    version_re = re.compile(r"^__version__ = [\"']([\w_.-]+)[\"']$")
+    roots = [root_dir, os.path.join(root_dir, 'src')]
+    for root in roots:
+        version_path = os.path.join(root_dir, PACKAGE, 'version.py')
+        if not os.path.exists(version_path):
+            continue
+        with codecs.open(version_path, 'r', 'utf-8') as f:
+            for line in f:
+                match = version_re.match(line[:-1])
+                if match:
+                    return match.groups()[0]
+    return '0.1.0'
 
 
 def clean_readme(fname):
