@@ -44,3 +44,16 @@ Change = collections.namedtuple(
     'Change',
     ['action', 'key', 'previous', 'target', 'sink', 'delta'],
 )
+
+
+#: ReplicationContext: the context of a replication run
+#: Attributes:
+#:  - source (DataSource): the data source
+#:  - sinks (DataSink list): all sinks
+#:  - keys (text set): all item keys
+#:  - changes ((DataSink, {Action: {key: Change}}) list): list of changes per sink
+#:  - stats ({Action: max_affected}): maps an action to the total number of items
+ReplicationContext = collections.namedtuple(
+    'ReplicationContext',
+    ['source', 'sinks', 'keys', 'changes', 'stats'],
+)

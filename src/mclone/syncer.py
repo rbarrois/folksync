@@ -1,29 +1,26 @@
-from .datastructs import Action, Change, ReplicationMode, ReplicationStepState
+import collections
+
+from .datastructs import Action, Change, ReplicationContext, ReplicationMode, ReplicationStepState
 
 
 class Replicator:
-    def __init__(self, source, sinks, interaction):
+    def __init__(self, source, sinks, interactor):
         self.source = source
         self.sinks = sinks
-        self.interaction = interaction
+        self.interactor = interactor
 
     def replicate(self, mode):
         source_data = self.source.all()
 
         # changes is a list of (sink, sink_changes) tuples
         # Where sink_changes is a dict(key => Change)
-        changes = []
+        changes = collections.OrderedDict()
+        stats = {action: set() for action in Action}
 
         for sink in self.sinks:
             sink_data = sink.all()
             sink_skips = sink.get_skipped_keys()
-            sink_changes = {
-                Action.CREATED: {},
-                Action.UPDATED: {},
-                Action.SKIPPED: {},
-                Action.UNCHANGED: {},
-                Action.DELETED: {},
-            }
+            sink_changes = {action: {} for action in Action}
 
             # Process all keys (local + remote)
             keys = set(source_data.keys()) | set(sink_data.keys())
@@ -71,15 +68,24 @@ class Replicator:
                     )
 
                 sink_changes[change.action][key] = change
+                stats[change.action].add(key)
                 # End `for key in keys`
 
-            changes.append((sink, sink_changes))
+            changes[sink] = sink_changes
             # End `for sink in self.sinks`
 
-        self.interaction.notify_changes(changes)
-        mode = self.interaction.choose_mode(mode)
+        context = ReplicationContext(
+            source=self.source,
+            sinks=self.sinks,
+            keys=set(source_data.keys()),
+            changes=changes,
+            stats={action: len(stats[action]) for action in Action},
+        )
 
-        for sink, sink_changes in changes:
+        self.interactor.notify_changes(context)
+        mode = self.interactor.choose_mode(context, mode)
+
+        for sink, sink_changes in changes.items():
             created = sink_changes[Action.CREATED]
             updated = sink_changes[Action.UPDATED]
             deleted = sink_changes[Action.DELETED]
@@ -90,6 +96,7 @@ class Replicator:
                 handler=sink.create_batch,
                 changes=created,
                 condition=mode in [ReplicationMode.ADDITIVE, ReplicationMode.FULL],
+                context=context,
             )
 
             self._run_step(
@@ -98,6 +105,7 @@ class Replicator:
                 handler=sink.update_batch,
                 changes=updated,
                 condition=mode in [ReplicationMode.ADDITIVE, ReplicationMode.FULL],
+                context=context,
             )
 
             self._run_step(
@@ -106,14 +114,15 @@ class Replicator:
                 handler=sink.delete_batch,
                 changes=deleted,
                 condition=mode in [ReplicationMode.FULL],
+                context=context,
             )
 
-    def _run_step(self, sink, action, handler, changes, condition):
+    def _run_step(self, sink, action, handler, changes, condition, context):
         if not changes:
-            self.interaction.notify_step(sink, action, ReplicationStepState.EMPTY)
+            self.interactor.notify_step(sink, action, ReplicationStepState.EMPTY, context)
         elif not condition:
-            self.interaction.notify_step(sink, action, ReplicationStepState.UNCHANGED)
+            self.interactor.notify_step(sink, action, ReplicationStepState.SKIPPED, context)
         else:
-            self.interaction.notify_step(sink, action, ReplicationStepState.START)
+            self.interactor.notify_step(sink, action, ReplicationStepState.START, context)
             handler(changes)
-            self.interaction.notify_step(sink, action, ReplicationStepState.SUCCESS)
+            self.interactor.notify_step(sink, action, ReplicationStepState.SUCCESS, context)
