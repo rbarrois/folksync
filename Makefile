@@ -44,19 +44,19 @@ check_manifest:
 
 # Note: we run the linter in two runs, because our __init__.py files has specific warnings we want to exclude
 flake8:
-	$(FLAKE8) --config .flake8 --exclude $(PACKAGE)/__init__.py $(PACKAGE)
-	$(FLAKE8) --config .flake8 --ignore F401 $(PACKAGE)/__init__.py
+	$(FLAKE8) --config .flake8 --exclude $(SRC_DIR)/__init__.py $(SRC_DIR)
+	$(FLAKE8) --config .flake8 --ignore F401 $(SRC_DIR)/__init__.py
 
 .PHONY: lint check_manifest flake8
 
 coverage:
 	$(COVERAGE) erase
-	$(COVERAGE) run "--include=$(PACKAGE)/*.py,$(TESTS_DIR)/*.py" --branch setup.py test
-	$(COVERAGE) report "--include=$(PACKAGE)/*.py,$(TESTS_DIR)/*.py"
-	$(COVERAGE) html "--include=$(PACKAGE)/*.py,$(TESTS_DIR)/*.py"
+	$(COVERAGE) run "--include=$(SRC_DIR)/*.py,$(TESTS_DIR)/*.py" --branch setup.py test
+	$(COVERAGE) report "--include=$(SRC_DIR)/*.py,$(TESTS_DIR)/*.py"
+	$(COVERAGE) html "--include=$(SRC_DIR)/*.py,$(TESTS_DIR)/*.py"
 
 coverage-xml-report: coverage
-	$(COVERAGE) xml "--include=$(PACKAGE)/*.py,$(TESTS_DIR)/*.py"
+	$(COVERAGE) xml "--include=$(SRC_DIR)/*.py,$(TESTS_DIR)/*.py"
 
 doc:
 	$(MAKE) -C $(DOC_DIR) html
