@@ -14,13 +14,21 @@ class DictSource(base.DataSource):
     def all(self):
         return dict(self.data)
 
+    def __repr__(self):
+        return '<%s: data=%r>' % (self.__class__.__name__, self.data)
+
 
 class DictSink(base.DataSink):
-    def __init__(self, initial):
+    def __init__(self, initial, name, skipped=()):
         self.initial = initial
         self.created = {}
         self.updated = {}
         self.deleted = []
+        self.skipped = skipped
+        self.name = name
+
+    def get_skipped_keys(self, all_keys):
+        return set(key for key in self.skipped if key in all_keys)
 
     def all(self):
         base = dict(self.initial)
@@ -52,6 +60,17 @@ class DictSink(base.DataSink):
             assert c.key in self.initial
             assert c.key not in self.deleted
             self.deleted.append(c.key)
+
+    def __str__(self):
+        return '<%s: %s>' % (self.__class__.__name__, self.name)
+
+    def __repr__(self):
+        return '<%s %s: initial=%r skipped=%r>' % (
+            self.__class__.__name__,
+            self.name,
+            self.initial,
+            self.skipped,
+        )
 
 
 class ThresholDeciderFactory(factory.Factory):
@@ -90,19 +109,23 @@ class DictSinkFactory(factory.Factory):
         model = DictSink
 
     initial = factory.Dict({})
+    name = factory.Sequence(lambda i: 'sink%s' % i)
 
 
 class ReplicatorFactory(factory.Factory):
     class Meta:
         model = syncer.Replicator
-        exclude = ['sink0', 'sink1']
 
     sink0 = factory.SubFactory(DictSinkFactory)
     sink1 = factory.SubFactory(DictSinkFactory)
 
     source = factory.SubFactory(DictSourceFactory)
-    sinks = factory.List([
-        factory.SelfAttribute('..sink0'),
-        factory.SelfAttribute('..sink1'),
-    ])
     interactor = factory.SubFactory(InteractorFactory)
+
+    @classmethod
+    def _adjust_kwargs(cls, **kwargs):
+        sinks = [
+            kwargs.pop(key) for key in sorted(kwargs) if key.startswith('sink')
+        ]
+        kwargs['sinks'] = sinks
+        return kwargs

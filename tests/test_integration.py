@@ -21,10 +21,10 @@ class SyncTest(unittest.TestCase):
         root_logger.addHandler(logging.StreamHandler())
         root_logger.setLevel(logging.INFO)
 
-    def _replicate(self, mode, **kwargs):
+    def _replicate(self, mode, only_keys=(), **kwargs):
         # Create a replicator, run it, return sinks.
         repl = factories.ReplicatorFactory(**kwargs)
-        repl.replicate(mode)
+        repl.replicate(mode, only_keys=only_keys)
         return repl.sinks
 
     # Normal operation
@@ -90,6 +90,64 @@ class SyncTest(unittest.TestCase):
         self.assertEqual({'b': 2}, sink1.created)
         self.assertEqual({'a': 1}, sink1.updated)
         self.assertEqual(['d'], sink1.deleted)
+
+
+    # Wokring on a subset of keys
+    # ===========================
+
+    def test_mixed_only_keys(self):
+        sinks = self._replicate(
+            source__data={'a': 1, 'b': 2},
+            sink0__initial={'b': 3, 'c': 4},
+            sink1__initial={'a': 2, 'd': 5},
+            mode=datastructs.ReplicationMode.FULL,
+            only_keys=['a', 'c'],
+        )
+        sink0, sink1 = sinks
+        self.assertEqual({'a': 1}, sink0.created)
+        self.assertEqual({}, sink0.updated)
+        self.assertEqual(['c'], sink0.deleted)
+
+        self.assertEqual({}, sink1.created)
+        self.assertEqual({'a': 1}, sink1.updated)
+        self.assertEqual([], sink1.deleted)
+
+    def test_skipped_keys(self):
+        sinks = self._replicate(
+            source__data={'a': 1, 'b': 2},
+            sink0__initial={'b': 3, 'c': 4},
+            sink0__skipped=['a'],
+            sink1__initial={'a': 2, 'd': 5},
+            sink1__skipped=['d'],
+            mode=datastructs.ReplicationMode.FULL,
+        )
+        sink0, sink1 = sinks
+        self.assertEqual({}, sink0.created)
+        self.assertEqual({'b': 2}, sink0.updated)
+        self.assertEqual(['c'], sink0.deleted)
+
+        self.assertEqual({'b': 2}, sink1.created)
+        self.assertEqual({'a': 1}, sink1.updated)
+        self.assertEqual([], sink1.deleted)
+
+    def test_skipped_and_restricted(self):
+        sinks = self._replicate(
+            source__data={'a': 1, 'b': 2},
+            sink0__initial={'b': 3, 'c': 4},
+            sink0__skipped=['a'],
+            sink1__initial={'a': 2, 'd': 5},
+            sink1__skipped=['d'],
+            mode=datastructs.ReplicationMode.FULL,
+            only_keys=['a', 'c'],
+        )
+        sink0, sink1 = sinks
+        self.assertEqual({}, sink0.created)
+        self.assertEqual({}, sink0.updated)
+        self.assertEqual(['c'], sink0.deleted)
+
+        self.assertEqual({}, sink1.created)
+        self.assertEqual({'a': 1}, sink1.updated)
+        self.assertEqual([], sink1.deleted)
 
 
     # Using the ThresholdDecider

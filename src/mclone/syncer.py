@@ -9,7 +9,7 @@ class Replicator:
         self.sinks = sinks
         self.interactor = interactor
 
-    def replicate(self, mode):
+    def replicate(self, mode, only_keys=()):
         source_data = self.source.all()
 
         # changes is a list of (sink, sink_changes) tuples
@@ -19,13 +19,18 @@ class Replicator:
 
         for sink in self.sinks:
             sink_data = sink.all()
-            sink_skips = sink.get_skipped_keys()
             sink_changes = {action: {} for action in Action}
 
             # Process all keys (local + remote)
-            keys = set(source_data.keys()) | set(sink_data.keys())
+            base_keys = set(source_data.keys()) | set(sink_data.keys())
+            if only_keys:
+                keys = base_keys & set(only_keys)
+            else:
+                keys = base_keys
+            sink_skips = sink.get_skipped_keys(keys)
 
             for key in keys:
+
                 source_item = source_data.get(key)
                 sink_item = sink_data.get(key)
 

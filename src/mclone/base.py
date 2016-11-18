@@ -24,8 +24,8 @@ class DataSource:
 
 class DataSink(DataSource):
 
-    def get_skipped_keys(self):
-        return {}
+    def get_skipped_keys(self, source_keys):
+        return set()
 
     def merge(self, base, updated):
         raise NotImplementedError()
