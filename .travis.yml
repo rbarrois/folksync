@@ -1,16 +1,22 @@
-language: python
-python:
-- '3.4'
-- '3.5'
-- '3.6-dev'
 sudo: false
+language: python
 
-cache:
-  directories:
-    - $HOME/.cache/pip
+matrix:
+  include:
+    - python: "3.4"
+      env: TOXENV=py34
+    - python: "3.5"
+      env: TOXENV=py35
+    - python: "3.6"
+      env: TOXENV=py36
+    - python: "3.4"
+      env: TOXENV=lint
 
 install:
-  - pip install "pip>=7.1.0"
-  - pip install tox-travis tox
+  - pip install tox
 
 script: tox
+
+notifications:
+  email: false
+  irc: "irc.freenode.org#xelnext"
