@@ -6,6 +6,6 @@ graft src/folksync
 prune docs
 prune tests
 
-global-exclude *.py[cod]
+global-exclude *.py[cod] .*.sw[po]
 
 exclude Makefile tox.ini .flake8

@@ -80,7 +80,7 @@ class BaseInteractor:
         changes = context.changes[sink][action]
         for key, change in sorted(changes.items()):
             self.printer.display(
-                    "Sink %(sink)s: %(action)s: %(key)s %(delta)s",
+                "Sink %(sink)s: %(action)s: %(key)s %(delta)s",
                 dict(
                     sink=sink,
                     action=action.name,
@@ -91,7 +91,8 @@ class BaseInteractor:
 
 
 class ThresholdDecider(BaseDecider):
-    def __init__(self, *,
+    def __init__(
+            self, *,
             common_ratio=0.1, created_ratio=None, updated_ratio=None,
             skipped_ratio=None, deleted_ratio=None):
         self.ratios = {
