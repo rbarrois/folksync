@@ -1,7 +1,7 @@
 include CREDITS ChangeLog LICENSE README.rst
 include requirements*.txt
 
-graft src/mclone
+graft src/folksync
 
 prune docs
 prune tests

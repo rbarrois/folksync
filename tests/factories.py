@@ -1,10 +1,10 @@
 import factory
 import io
 
-from mclone import base
-from mclone import datastructs
-from mclone import interaction
-from mclone import syncer
+from folksync.mclone import base
+from folksync.mclone import datastructs
+from folksync.mclone import interaction
+from folksync.mclone import syncer
 
 
 class DictSource(base.DataSource):

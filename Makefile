@@ -1,4 +1,4 @@
-PACKAGE=mclone
+PACKAGE=folksync
 
 SRC_DIR=src/$(PACKAGE)
 TESTS_DIR=tests

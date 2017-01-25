@@ -10,7 +10,7 @@ class BaseDecider:
 
 
 class LogPrinter:
-    def __init__(self, logname='mclone'):
+    def __init__(self, logname='folksync.mclone'):
         self.logger = logging.getLogger(logname)
 
     def display(self, message, ctxt):

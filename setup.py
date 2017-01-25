@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) The mclone project
+# Copyright (c) The folksync project
 # This code is distributed under the two-clause BSD License.
 
 import codecs
@@ -38,7 +38,7 @@ def clean_readme(fname):
         )
 
 
-PACKAGE = 'mclone'
+PACKAGE = 'folksync'
 
 
 setup(
@@ -46,10 +46,10 @@ setup(
     version=get_version(),
     author="Raphaël Barrois",
     author_email='raphael.barrois_%s@polytechnique.org' % PACKAGE,
-    description="Simple framework for inter-system, mono-source / multi-target data replication",
+    description="Simple framework for directory synchronization to multiple third-party services",
     long_description=clean_readme('README.rst'),
     license='BSD',
-    keywords=['mclone', 'replication'],
+    keywords=['folksync', 'replication'],
     url='https://github.com/rbarrois/%s' % PACKAGE,
     install_requires=[
     ],
