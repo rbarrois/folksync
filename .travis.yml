@@ -1,0 +1,16 @@
+language: python
+python:
+- '3.4'
+- '3.5'
+- '3.6-dev'
+sudo: false
+
+cache:
+  directories:
+    - $HOME/.cache/pip
+
+install:
+  - pip install "pip>=7.1.0"
+  - pip install tox-travis tox
+
+script: tox
