@@ -53,6 +53,9 @@ setup(
     url='https://github.com/rbarrois/%s' % PACKAGE,
     install_requires=[
     ],
+    extras_requires={
+        'ldap': ['pyldap'],
+    },
     setup_requires=[
         'setuptools>=1',
     ],
