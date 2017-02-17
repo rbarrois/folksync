@@ -52,8 +52,9 @@ setup(
     keywords=['folksync', 'replication'],
     url='https://github.com/rbarrois/%s' % PACKAGE,
     install_requires=[
+        'getconf',
     ],
-    extras_requires={
+    extras_require={
         'ldap': ['pyldap'],
     },
     setup_requires=[

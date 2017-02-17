@@ -13,7 +13,8 @@ class Service(enum.Enum):
 Account = collections.namedtuple(
     'Account',
     [
-        'uid',  # uuid
+        'hrid',  # unique ID
+        'uuid',  # uuid
         'creation_date',  # datetime
         'deactivation_date',  # datetime
 
@@ -23,9 +24,6 @@ Account = collections.namedtuple(
         'fixed_line',  # Ascii
         'mobile_line',  # Ascii
 
-        'owned_groups',  # [group_uid]
-        'groups',  # [group_uid]
-
         'external_uids',  # {service_code: uid}
     ],
 )
@@ -34,11 +32,15 @@ Account = collections.namedtuple(
 Group = collections.namedtuple(
     'Group',
     [
-        'uid',  # uuid
+        'hrid',  # unique ID
+        'uuid',  # uuid
         'creation_date',  # datetime
         'deactivation_date',  # datetime
 
         'name',  # ascii
         'description',  # Text
+
+        'owners',  # [uid]
+        'members',  # [uid]
     ],
 )

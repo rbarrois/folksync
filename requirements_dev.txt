@@ -1,4 +1,4 @@
--e .
+-e .[ldap]
 -rrequirements_test.txt
 
 tox
