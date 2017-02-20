@@ -83,7 +83,7 @@ class Field:
             return None
 
 
-class LdapSource:
+class OpenLdapSource:
     def __init__(self, config):
         self.config = config
         self.source = Ldap(
@@ -101,6 +101,8 @@ class LdapSource:
         'shadowExpire': Field(FieldType.TIMESTAMP),
 
         'uid': Field(FieldType.TEXT),  # username
+        'givenName': Field(FieldType.TEXT),  # firstname
+        'sn': Field(FieldType.TEXT),  # lastname
         'cn': Field(FieldType.TEXT),  # displayname
         'mail': Field(FieldType.TEXT),
         'telephoneNumber': Field(FieldType.TEXT),  # fixed_line
@@ -121,7 +123,11 @@ class LdapSource:
                 creation_date=values['createTimestamp'],
                 deactivation_date=values['shadowExpire'],
 
+                type=datastructs.Type.INTERNAL,
+
                 username=values['uid'],
+                firstname=values['givenName'],
+                lastname=values['sn'],
                 displayname=values['cn'],
                 email=values['mail'],
                 fixed_line=values['telephoneNumber'],

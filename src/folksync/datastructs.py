@@ -10,6 +10,12 @@ class Service(enum.Enum):
     TRELLO = 'trello'
 
 
+class Type(enum.Enum):
+    INTERNAL = 'internal'
+    CONTRACTOR = 'contractor'
+    EXTERNAL = 'external'
+
+
 Account = collections.namedtuple(
     'Account',
     [
@@ -18,7 +24,11 @@ Account = collections.namedtuple(
         'creation_date',  # datetime
         'deactivation_date',  # datetime
 
+        'type',  # Type
+
         'username',  # Text
+        'firstname',  # Text
+        'lastname',  # Text
         'displayname',  # Text
         'email',  # Ascii
         'fixed_line',  # Ascii

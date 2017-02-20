@@ -3,7 +3,7 @@ import importlib
 
 
 class SourceRegistry(enum.Enum):
-    ldap = 'folksync.sources.ldap.LdapSource'
+    openldap = 'folksync.sources.ldap.OpenLdapSource'
 
 
 def load_source(name, config):
