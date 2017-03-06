@@ -33,8 +33,8 @@ Features
 * Include options to handle ownership transfer for previous team members' data
 
 
-Built-in service
-----------------
+Built-in services
+-----------------
 
 The following sources are planned:
 

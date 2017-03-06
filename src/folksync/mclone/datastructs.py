@@ -25,10 +25,12 @@ class ReplicationMode(enum.Enum):
 
 
 class ReplicationStepState(enum.Enum):
-    EMPTY = 0
-    SKIPPED = 1
-    START = 2
-    SUCCESS = 3
+    EMPTY = 0x0
+    SKIPPED = 0x1
+    EXEC = 0x2
+
+    START = 0x10
+    SUCCESS = 0x11
 
 
 #: Change: an atomic change.
@@ -56,4 +58,16 @@ Change = collections.namedtuple(
 ReplicationContext = collections.namedtuple(
     'ReplicationContext',
     ['source', 'sinks', 'keys', 'changes', 'stats'],
+)
+
+
+#: ReplicationStep: a replication step
+#: Attributes:
+#:  - sink (DataSink): the sink
+#:  - action (Action): the action to display
+#:  - state (ReplicationStepState): the state of the replication step
+#:  - context (ReplicationContext): the step's context
+ReplicationStep = collections.namedtuple(
+    'ReplicationStep',
+    ['sink', 'action', 'state', 'context'],
 )

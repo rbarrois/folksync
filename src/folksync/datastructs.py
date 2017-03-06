@@ -2,6 +2,11 @@ import collections
 import enum
 
 
+class ObjectKind(enum.Enum):
+    ACCOUNT = 'account'
+    GROUP = 'group'
+
+
 class Service(enum.Enum):
 
     GITHUB = 'github'

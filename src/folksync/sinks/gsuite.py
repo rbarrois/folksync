@@ -26,16 +26,8 @@ class GEntryDict:
 
 
 class GSuiteUserAPI:
-    USER_FIELDS = [
-        'hrid',
-        'uuid',
-        'username',
-        'firstname',
-        'lastname',
-        'email',
-        'fixed_line',
-        'mobile_line',
-    ]
+    def __init__(self, client):
+        self.client = client
 
     @classmethod
     def to_folksync(cls, user):
@@ -55,93 +47,109 @@ class GSuiteUserAPI:
             deactivation_date=None,
             type=None,
             username=get_entry(user['externalIds'], type='account'),
-            firstname=user['name']['givenName'],
-            lastname=user['name']['lastName'],
+            firstname=None,
+            lastname=None,
             email=user['primaryEmail'],
-            fixed_line=get_entry(user['phones'], type='work'),
-            mobile_line=get_entry(user['phones'], type='work_mobile'),
-            external_uids={
-                datastructs.Service.GSUITE: user['id'],
-            },
+            fixed_line=None,
+            mobile_line=None,
+            external_uids=None,
         )
 
     @classmethod
-    def from_folksync(cls, user, remote_id=None):
+    def merge(cls, remote, local):
         phones = []
-        if user.mobile_line:
+        if local.mobile_line:
             phones.append({
                 'primary': True,
                 'type': 'work_mobile',
-                'value': user.mobile_line,
+                'value': local.mobile_line,
             })
-        if user.fixed_line:
+        if local.fixed_line:
             phones.append({
                 'primary': False,
                 'type': 'work',
-                'value': user.fixed_line,
+                'value': local.fixed_line,
             })
 
         external_ids = [
             {
                 'type': 'custom',
                 'customType': 'UUID',
-                'value': user.uuid,
+                'value': local.uuid,
             },
             {
                 'type': 'custom',
                 'customType': 'hrid',
-                'value': user.hrid,
+                'value': local.hrid,
             },
             {
                 'type': 'account',
-                'value': user.username,
+                'value': local.username,
             },
         ]
 
-        # GSuite might have extra emails
+        # XXX: GSuite might have extra emails, we'll have to fix this
         emails = [
             {
                 'primary': True,
                 'type': 'work',
-                'address': user.mail,
+                'address': local.mail,
             },
         ]
 
-        return {
+        new_remote = remote.copy()
+        new_remote.update({
             # 'aliases': [],  # FIXME: Store in the directory
             'emails': emails,
             'externalIds': external_ids,
             'id': remote_id,
             # 'hashFunction': 'MD5',  # FIXME: Use a password
             'name': {
-                'givenName': user.firstname,
-                'familyName': user.lastname,
+                'givenName': local.firstname,
+                'familyName': local.lastname,
             },
-            # 'password': user.password,  # FIXME: Use a password
+            # 'password': local.password,  # FIXME: Use a password
             'phones': phones,
-            'primaryEmail': user.mail,
-            'suspended': now >= user.deactivation_date,
+            'primaryEmail': local.mail,
+            'suspended': now >= local.deactivation_date,
+        })
+        return new_remote
+
+    def fetch(self):
+        pass
+
+    def all(self):
+        return {
+            self.to_folksync(obj): obj
+            for obj in self.fetch()
         }
 
-    def create_batch(self, client, changes):
+    def create_batch(self, changes):
         pass
 
-    def update_batch(self, client, changes):
+    def update_batch(self, changes):
         pass
 
-    def delete_batch(self, client, changes):
+    def delete_batch(self, changes):
         pass
 
 
 class GSuiteSink:
+    def __init__(self):
+        self.client = None
+        self.user_api = None
+        self.group_api = None
+
     def connect(self):
-        pass
+        self.client = 42
+        self.user_api = GSuiteUserAPI(self.client)
+        self.group_api = GSuiteGroupAPI(self.client)
 
     def fetch_users(self):
-        pass
+        return self.user_api.all()
 
     def fetch_groups(self):
-        pass
+        return self.group_api.all()
 
     @classmethod
     def map_user(cls, user):
