@@ -24,13 +24,13 @@ class ReplicationMode(enum.Enum):
     FULL = 2
 
 
-class ReplicationStepState(enum.Enum):
+class ReplicationStep(enum.Enum):
     EMPTY = 0x0
     SKIPPED = 0x1
     EXEC = 0x2
 
-    START = 0x10
-    SUCCESS = 0x11
+    NOTIFY = 0x10
+    CHOOSE_MODE = 0x11
 
 
 #: Change: an atomic change.
@@ -39,35 +39,42 @@ class ReplicationStepState(enum.Enum):
 #: - key (text): the primary key for the field
 #: - previous (dict text => object): data coming from the sink, or None for a creation
 #: - target (dict text => object): data coming from the source, or None for a deletion
-#: - sink (DataSink): the DataSink managing the change
 #: - delta (object): opaque object used by the DataSink to notify of a change,
 #:     and keep context; None for a deletion.
 Change = collections.namedtuple(
     'Change',
-    ['action', 'key', 'previous', 'target', 'sink', 'delta'],
+    ['action', 'key', 'previous', 'target', 'delta'],
 )
 
 
 #: ReplicationContext: the context of a replication run
 #: Attributes:
-#:  - source (DataSource): the data source
-#:  - sinks (DataSink list): all sinks
 #:  - keys (text set): all item keys
-#:  - changes ((DataSink, {Action: {key: Change}}) list): list of changes per sink
+#:  - changes {Action: {key: Change}}: list of changes per type
 #:  - stats ({Action: max_affected}): maps an action to the total number of items
 ReplicationContext = collections.namedtuple(
     'ReplicationContext',
-    ['source', 'sinks', 'keys', 'changes', 'stats'],
+    ['keys', 'changes', 'stats'],
 )
 
 
-#: ReplicationStep: a replication step
+#: ReplicationEvent: a replication event
 #: Attributes:
-#:  - sink (DataSink): the sink
+#:  - step (ReplicationStep): the kind of replication event
 #:  - action (Action): the action to display
-#:  - state (ReplicationStepState): the state of the replication step
 #:  - context (ReplicationContext): the step's context
-ReplicationStep = collections.namedtuple(
-    'ReplicationStep',
-    ['sink', 'action', 'state', 'context'],
+ReplicationEvent = collections.namedtuple(
+    'ReplicationEvent',
+    ['step', 'action', 'context'],
+)
+
+
+#: ReplicationRun: a replication run description
+#: Attributes:
+#:  - source (DataSource): the data source
+#:  - sink (DataSink): the sink being replicated to
+#:  - mode (ReplicationMode): the replication mode
+ReplicationRun = collections.namedtuple(
+    'ReplicationRun',
+    ['source', 'sink', 'mode'],
 )

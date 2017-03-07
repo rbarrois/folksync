@@ -289,7 +289,7 @@ class SyncTest(unittest.TestCase):
             sink1__initial={'b': 2},
             mode=datastructs.ReplicationMode.FULL,
             interactor__decider=factories.ShellDeciderFactory(
-                stdin=['a', 'b', '42', ''],
+                stdin=['a', 'b', '42', ''] * 2,  # Duplicate stdin: once per sink
             ),
         )
         self.assertEqual({}, sink0.created)
@@ -307,7 +307,7 @@ class SyncTest(unittest.TestCase):
             sink1__initial={'b': 2},
             mode=datastructs.ReplicationMode.ADDITIVE,
             interactor__decider=factories.ShellDeciderFactory(
-                stdin=['2'],
+                stdin=['2'] * 2,  # Duplicate stdin: once per sink
             ),
         )
         self.assertEqual({}, sink0.created)
@@ -325,7 +325,7 @@ class SyncTest(unittest.TestCase):
             sink1__initial={'b': 2},
             mode=datastructs.ReplicationMode.FULL,
             interactor__decider=factories.ShellDeciderFactory(
-                stdin=['1'],
+                stdin=['1'] * 2,  # Duplicate stdin: once per sink
             ),
         )
         self.assertEqual({}, sink0.created)
@@ -343,7 +343,7 @@ class SyncTest(unittest.TestCase):
             sink1__initial={'b': 2},
             mode=datastructs.ReplicationMode.FULL,
             interactor__decider=factories.ShellDeciderFactory(
-                stdin=['0'],
+                stdin=['0'] * 2,  # Duplicate stdin: once per sink
             ),
         )
         self.assertEqual({}, sink0.created)

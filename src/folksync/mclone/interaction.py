@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from .datastructs import Action, ReplicationMode, ReplicationStepState
+from .datastructs import Action, ReplicationMode, ReplicationStep
 
 
 class BaseDecider:
@@ -22,68 +22,79 @@ class BaseInteractor:
         self.printer = printer or LogPrinter()
         self.decider = decider or BaseDecider()
 
-    def notify_changes(self, context):
+        self.HANDLERS = {
+            ReplicationStep.NOTIFY: self.notify_changes,
+            ReplicationStep.CHOOSE_MODE: self.choose_mode,
+            ReplicationStep.EMPTY: self.notify_step,
+            ReplicationStep.SKIPPED: self.notify_step,
+            ReplicationStep.EXEC: self.notify_step,
+        }
+
+    def __call__(self, event, run):
+        handler = self.HANDLERS[event.step]
+        return handler(event, run)
+
+    def notify_changes(self, event, run):
         # changes is a list of {action => {key => change}} dicts
-        if not context.changes:
+        if not event.context.changes:
             return
         self.printer.display(
-            "Replicating %(total)d objects to %(sinks)d sinks: "
+            "Replicating %(total)d objects to sink %(sink)s: "
             "created=%(created)d, updated=%(updated)d, skipped=%(skipped)d, deleted=%(deleted)d",
             dict(
-                total=len(context.keys),
-                sinks=len(context.sinks),
-                created=context.stats[Action.CREATED],
-                skipped=context.stats[Action.SKIPPED],
-                updated=context.stats[Action.UPDATED],
-                deleted=context.stats[Action.DELETED],
+                total=len(event.context.keys),
+                sink=run.sink.name,
+                created=event.context.stats[Action.CREATED],
+                skipped=event.context.stats[Action.SKIPPED],
+                updated=event.context.stats[Action.UPDATED],
+                deleted=event.context.stats[Action.DELETED],
             ),
         )
 
-    def choose_mode(self, context, mode):
-        new_mode = self.decider.choose_mode(context, mode)
-        if new_mode == mode:
+    def choose_mode(self, event, run):
+        new_mode = self.decider.choose_mode(event.context, run.mode)
+        if new_mode == run.mode:
             self.printer.display(
                 "Replicating in %(mode)s mode",
                 dict(
-                    mode=mode.name,
+                    mode=run.mode.name,
                 ),
             )
         else:
             self.printer.display(
                 "Switched mode from %(old)s to %(new)s",
                 dict(
-                    old=mode.name,
+                    old=run.mode.name,
                     new=new_mode.name,
                 ),
             )
         return new_mode
 
-    def notify_step(self, sink, action, state, context):
+    def notify_step(self, event, run):
         state_map = {
-            ReplicationStepState.EMPTY: "Nothing to do",
-            ReplicationStepState.SKIPPED: "Disabled",
-            ReplicationStepState.START: "Start",
-            ReplicationStepState.SUCCESS: "Success",
+            ReplicationStep.EMPTY: "Nothing to do",
+            ReplicationStep.SKIPPED: "Disabled",
+            ReplicationStep.EXEC: "Start",
         }
 
-        width = str(len(str(len(context.keys))))
+        width = str(len(str(len(event.context.keys))))
         self.printer.display(
-            "Sink %(sink)s: %(action)s %(items)" + width + "d items: " + state_map[state],
+            "Sink %(sink)s: %(action)s %(items)" + width + "d items: " + state_map[event.step],
             dict(
-                action=action.name,
-                sink=sink,
-                items=len(context.changes[sink][action]),
+                action=event.action.name,
+                sink=run.sink,
+                items=len(event.context.changes[event.action]),
             ),
         )
-        if state != ReplicationStepState.START:
+        if event.step != ReplicationStep.EXEC:
             return
-        changes = context.changes[sink][action]
+        changes = event.context.changes[event.action]
         for key, change in sorted(changes.items()):
             self.printer.display(
                 "Sink %(sink)s: %(action)s: %(key)s %(delta)s",
                 dict(
-                    sink=sink,
-                    action=action.name,
+                    sink=run.sink,
+                    action=event.action.name,
                     key=change.key,
                     delta=change.delta,
                 ),

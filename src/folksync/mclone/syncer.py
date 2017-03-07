@@ -1,34 +1,25 @@
 import collections
 
-from .datastructs import Action, Change, ReplicationContext, ReplicationMode, ReplicationStepState
+from .datastructs import Action, Change, ReplicationRun
+from .datastructs import ReplicationContext, ReplicationMode, ReplicationStep, ReplicationEvent
 
 
-def replicate(self, source_data, remote_data, mapper, mode, only_keys=()):
+def replicate(source_data, remote_data, mapper, keys):
 
     stats = {action: set() for action in Action}
-
     changes = {action: {} for action in Action}
 
-    # Process all keys (local + remote)
-    base_keys = set(source_data.keys()) | set(remote_data.keys())
-    if only_keys:
-        keys = base_keys & set(only_keys)
-    else:
-        keys = base_keys
-    sink_skips = sink.get_skipped_keys(keys)
-
-    for key in keys:
+    for key, default_action in sorted(keys.items()):
 
         source_item = source_data.get(key)
         sink_item = remote_data.get(key)
 
         # A source/sink may not provide empty items
         assert source_item is not None or sink_item is not None
-        if key in sink_skips:
+        if default_action is not None:
             change = Change(
-                action=Action.SKIPPED,
+                action=default_action,
                 key=key,
-                sink=sink,
                 target=source_item,
                 previous=None,
                 delta=None,
@@ -37,7 +28,6 @@ def replicate(self, source_data, remote_data, mapper, mode, only_keys=()):
             change = Change(
                 action=Action.DELETED,
                 key=key,
-                sink=sink,
                 target=source_item,
                 previous=sink_item,
                 delta=None,
@@ -54,7 +44,6 @@ def replicate(self, source_data, remote_data, mapper, mode, only_keys=()):
             change = Change(
                 action=action,
                 key=key,
-                sink=sink,
                 target=source_item,
                 previous=sink_item,
                 delta=delta,
@@ -65,13 +54,22 @@ def replicate(self, source_data, remote_data, mapper, mode, only_keys=()):
         # End `for key in keys`
 
     context = ReplicationContext(
-        keys=set(source_data.keys()),
+        keys=keys,
         changes=changes,
         stats={action: len(stats[action]) for action in Action},
     )
 
-    yield NOTIF_CHANGES
-    mode = yield CHOOSE_MODE(context, mode)
+    yield ReplicationEvent(
+        step=ReplicationStep.NOTIFY,
+        action=None,
+        context=context,
+    )
+    mode = yield ReplicationEvent(
+        step=ReplicationStep.CHOOSE_MODE,
+        action=None,
+        context=context,
+    )
+    assert mode in ReplicationMode  # Make sure the caller used .send(mode)
 
     MODE_ACTIONS = [
         (Action.CREATED, [ReplicationMode.ADDITIVE, ReplicationMode.FULL]),
@@ -79,19 +77,73 @@ def replicate(self, source_data, remote_data, mapper, mode, only_keys=()):
         (Action.DELETED, [ReplicationMode.FULL]),
     ]
 
-    for action, modes in Action:
+    for action, modes in MODE_ACTIONS:
         targets = changes[action]
         if not targets:
-            state = ReplicationStepState.EMPTY
+            step = ReplicationStep.EMPTY
         elif mode not in modes:
-            state = ReplicationStepState.SKIPPED
+            step = ReplicationStep.SKIPPED
         else:
-            state = ReplicationStepState.EXEC
+            step = ReplicationStep.EXEC
 
-        yield ReplicationStep(
-            sink=sink,
+        yield ReplicationEvent(
             action=action,
-            changes=targets,
-            state=state,
+            step=step,
             context=context,
         )
+
+
+class Replicator:
+    def __init__(self, source, sinks, interactor):
+        self.source = source
+        self.sinks = sinks
+        self.interactor = interactor
+
+    def replicate(self, mode, only_keys=()):
+        source_data = self.source.all()
+
+        for sink in self.sinks:
+            sink_data = sink.all()
+
+            # Process all keys (local + remote)
+            keys = {
+                key: None if key in only_keys or not only_keys else Action.SKIPPED
+                for key in set(source_data.keys()) | set(sink_data.keys())
+            }
+
+            for key in sink.get_skipped_keys(keys):
+                keys[key] = Action.SKIPPED
+
+            sink_replication = replicate(
+                source_data=source_data,
+                remote_data=sink_data,
+                mapper=sink.merge,
+                keys=keys,
+            )
+            run = ReplicationRun(
+                source=self.source,
+                sink=sink,
+                mode=mode,
+            )
+
+            reply = None
+            try:
+                while True:
+                    event = sink_replication.send(reply)
+                    reply = self.interactor(event, run)
+                    self.maybe_act(event, run)
+
+            except StopIteration:
+                pass
+
+    def maybe_act(self, event, run):
+        if event.step is not ReplicationStep.EXEC:
+            return
+
+        handlers = {
+            Action.CREATED: run.sink.create_batch,
+            Action.UPDATED: run.sink.update_batch,
+            Action.DELETED: run.sink.delete_batch,
+        }
+
+        handlers[event.action](changes=event.context.changes[event.action])
