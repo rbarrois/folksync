@@ -5,6 +5,22 @@ from .datastructs import ReplicationContext, ReplicationMode, ReplicationStep, R
 
 
 def replicate(source_data, remote_data, mapper, keys):
+    """Prepare a replication run.
+
+    Args:
+        source_data: {str: object}, items based on the authoritative source
+        remote_data: {str: object}, items as seen by the sink
+        mapper: fun(source, remote) => delta, function computing the delta between
+            a remote_data item and a source_data item
+        keys: {str: Action}, the list of keys to synchronize with an optional default action
+
+    Yields:
+        ReplicationEvent
+
+    Interface:
+        This function yields ReplicationEvent; it may expect a returning value for some steps,
+        provided through replicate.send(reply)
+    """
 
     stats = {action: set() for action in Action}
     changes = {action: {} for action in Action}
