@@ -51,6 +51,7 @@ class FieldType(enum.Enum):
     DATETIME = 1
     TIMESTAMP = 2
     BYTES = 3
+    IDENTIFIER = 4
 
 
 class Field:
@@ -62,6 +63,9 @@ class Field:
     def to_python(self, values):
         if self.kind == FieldType.TEXT:
             values = [value.decode('utf-8') for value in values]
+
+        elif self.kind == FieldType.IDENTIFIER:
+            values = [value.decode('utf-8').lower() for value in values]
 
         elif self.kind == FieldType.DATETIME:
             values = [
@@ -91,20 +95,21 @@ class OpenLdapSource:
             bind_dn=config.getstr('ldap.bind_dn'),
             bind_pwd=config.getstr('ldap.bind_pwd'),
         )
+        self._user_emails = {}
 
     def connect(self):
         self.source.connect()
 
     USER_FIELDS = {
-        'entryUUID': Field(FieldType.TEXT),
+        'entryUUID': Field(FieldType.IDENTIFIER),
         'createTimestamp': Field(FieldType.DATETIME),
         'shadowExpire': Field(FieldType.TIMESTAMP),
 
-        'uid': Field(FieldType.TEXT),  # username
+        'uid': Field(FieldType.IDENTIFIER),  # username
         'givenName': Field(FieldType.TEXT),  # firstname
         'sn': Field(FieldType.TEXT),  # lastname
         'cn': Field(FieldType.TEXT),  # displayname
-        'mail': Field(FieldType.TEXT),
+        'mail': Field(FieldType.IDENTIFIER),
         'telephoneNumber': Field(FieldType.TEXT),  # fixed_line
         'mobile': Field(FieldType.TEXT),
     }
@@ -123,6 +128,8 @@ class OpenLdapSource:
         )
 
         for dn, values in entries:
+            self._user_emails[dn] = values['mail']
+
             yield datastructs.Account(
                 uids=datastructs.AccountUID(
                     hrid=dn,
@@ -143,9 +150,13 @@ class OpenLdapSource:
                 external_uids={},
             )
 
+    EXTUSER_FIELDS = {
+        'mail': Field(FieldType.IDENTIFIER),
+    }
+
     GROUP_FIELDS = {
-        'entryUUID': Field(FieldType.TEXT),
-        'cn': Field(FieldType.TEXT),
+        'entryUUID': Field(FieldType.IDENTIFIER),
+        'cn': Field(FieldType.IDENTIFIER),
         'createTimestamp': Field(FieldType.DATETIME),
         'description': Field(FieldType.TEXT),
         'member': Field(FieldType.TEXT, multi_valued=True),
@@ -153,6 +164,16 @@ class OpenLdapSource:
     }
 
     def fetch_groups(self):
+        # Load external accounts
+        if self.config.getstr('ldap.extuser_base'):
+            ext_entries = self.source.fetch(
+                fields=self.EXTUSER_FIELDS,
+                base=self.config.getstr('ldap.extuser_base'),
+                filterstr=self.config.getstr('ldap.extuser_filter'),
+            )
+            for dn, values in ext_entries:
+                self._user_emails[dn] = values['mail'].lower()
+
         entries = self.source.fetch(
             fields=self.GROUP_FIELDS,
             base=self.config.getstr('ldap.groups_base'),
@@ -170,5 +191,9 @@ class OpenLdapSource:
                 deactivation_date=None,
                 description=values['description'],
                 owners=values['owner'],
-                members=values['member'],
+                members=sorted(
+                    self._user_emails[v]
+                    for v in values['member']
+                    if v in self._user_emails
+                ),
             )

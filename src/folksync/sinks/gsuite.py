@@ -1,3 +1,5 @@
+import time
+
 import apiclient.discovery
 import httplib2
 import oauth2client.service_account
@@ -10,6 +12,11 @@ SCOPES = [
     'https://www.googleapis.com/auth/admin.directory.group.readonly',
     'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
 ]
+
+#: Maximum batch size
+#: See https://developers.google.com/api-client-library/python/guide/batch
+BATCH_MAX_SIZE = 50
+BATCH_QPS = 10
 
 
 def unroll(endpoint, request, field):
@@ -180,6 +187,7 @@ class GSuiteGroupAPI:
         new_remote.update({
             'description': local.description or '',
             'email': '%s@%s' % (local.uids.name.lower(), 'polyconseil.fr'),
+            'members': local.members,
         })
         delta = {
             key: value
@@ -197,13 +205,40 @@ class GSuiteGroupAPI:
         g_endpoint = self.client.groups()
         m_endpoint = self.client.members()
         g_request = g_endpoint.list(domain='polyconseil.fr')
-        for group in unroll(g_endpoint, g_request, 'groups'):
-            m_request = m_endpoint.list(groupKey=group['id'])
-            members = [
-                m['email'] for m in unroll(m_endpoint, m_request, 'members')
-            ]
-            group['members'] = members
-            yield group
+        groups = {g['id']: g for g in unroll(g_endpoint, g_request, 'groups')}
+
+        pending = {
+            gid: m_endpoint.list(groupKey=gid)
+            for gid in sorted(groups)
+        }
+
+        def handle(gid, response, exception):
+            print("Handling group %r / %r" % (gid, groups[gid]['email']))
+            if exception is not None:
+                raise exception
+
+            request = pending.pop(gid)
+            if response is None:
+                return
+            groups[gid].setdefault('members', []).extend([
+                m['email'].lower() for m in response['members']
+            ])
+            if response.get('nextPageToken'):
+                pending[gid] = m_endpoint.list_next(request, response)
+
+        while pending:
+            batch = self.client.new_batch_http_request(callback=handle)
+            requests = sorted(pending.items())[:BATCH_MAX_SIZE]
+            print("Sending batch of %d requests" % len(requests))
+            for gid, request in requests:
+                batch.add(request, request_id=gid)
+            batch.execute()
+            if pending:
+                delay = len(requests) // BATCH_QPS + 1
+                print("Waiting %ds" % delay)
+                time.sleep(delay)
+
+        yield from groups.values()
 
     def all(self):
         items = self.fetch()
