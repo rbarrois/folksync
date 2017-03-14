@@ -12,6 +12,13 @@ SCOPES = [
 ]
 
 
+def unroll(endpoint, request, field):
+    while request is not None:
+        response = request.execute()
+        yield from response[field]
+        request = endpoint.list_next(request, response)
+
+
 class GEntryDict:
     def __init__(self, initial=(), value_field='value'):
         self.entries = {}
@@ -132,10 +139,7 @@ class GSuiteUserAPI:
     def fetch(self):
         endpoint = self.client.users()
         request = endpoint.list(domain='polyconseil.fr')
-        while request is not None:
-            response = request.execute()
-            yield from response['users']
-            request = endpoint.list_next(request, response)
+        yield from unroll(endpoint, request, 'users')
 
     def all(self):
         items = self.fetch()
@@ -161,13 +165,6 @@ class GSuiteGroupAPI:
     @classmethod
     def to_folksync_uids(cls, group):
         """Extract UIDs from a GSuite user object."""
-        def get_entry(entries, **kwargs):
-            for entry in entries:
-                for key, value in kwargs.items():
-                    if entry.get(key) != value:
-                        break
-                return entry
-
         return datastructs.GroupUID(
             hrid=None,
             uuid=None,
@@ -197,12 +194,16 @@ class GSuiteGroupAPI:
         return delta
 
     def fetch(self):
-        endpoint = self.client.groups()
-        request = endpoint.list(domain='polyconseil.fr')
-        while request is not None:
-            response = request.execute()
-            yield from response['groups']
-            request = endpoint.list_next(request, response)
+        g_endpoint = self.client.groups()
+        m_endpoint = self.client.members()
+        g_request = g_endpoint.list(domain='polyconseil.fr')
+        for group in unroll(g_endpoint, g_request, 'groups'):
+            m_request = m_endpoint.list(groupKey=group['id'])
+            members = [
+                m['email'] for m in unroll(m_endpoint, m_request, 'members')
+            ]
+            group['members'] = members
+            yield group
 
     def all(self):
         items = self.fetch()

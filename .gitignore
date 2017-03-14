@@ -3,6 +3,9 @@
 *.pyc
 *.pyo
 
+# Private development files
+private/
+
 # Build-related files
 docs/_build/
 .coverage
