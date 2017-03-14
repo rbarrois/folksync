@@ -1,3 +1,17 @@
+import apiclient.discovery
+import httplib2
+import oauth2client.service_account
+
+from .. import datastructs
+
+
+SCOPES = [
+    'https://www.googleapis.com/auth/admin.directory.user.readonly',
+    'https://www.googleapis.com/auth/admin.directory.group.readonly',
+    'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
+]
+
+
 class GEntryDict:
     def __init__(self, initial=(), value_field='value'):
         self.entries = {}
@@ -30,8 +44,8 @@ class GSuiteUserAPI:
         self.client = client
 
     @classmethod
-    def to_folksync(cls, user):
-        """Extract fields from a GSuite user object."""
+    def to_folksync_uids(cls, user):
+        """Extract UIDs from a GSuite user object."""
         def get_entry(entries, **kwargs):
             for entry in entries:
                 for key, value in kwargs.items():
@@ -39,34 +53,25 @@ class GSuiteUserAPI:
                         break
                 return entry
 
-
-        return datastructs.Account(
-            hrid=get_entry(user['externalIds'], type='custom', customType='hrid'),
-            uuid=get_entry(user['externalIds'], type='custom', customType='uuid'),
-            creation_date=None,
-            deactivation_date=None,
-            type=None,
-            username=get_entry(user['externalIds'], type='account'),
-            firstname=None,
-            lastname=None,
+        return datastructs.AccountUID(
+            hrid=get_entry(user.get('externalIds', {}), type='custom', customType='hrid'),
+            uuid=get_entry(user.get('externalIds', {}), type='custom', customType='uuid'),
+            username=get_entry(user.get('externalIds', {}), type='account'),
             email=user['primaryEmail'],
-            fixed_line=None,
-            mobile_line=None,
-            external_uids=None,
         )
 
     @classmethod
     def merge(cls, remote, local):
+        if remote is None:
+            remote = {}
         phones = []
         if local.mobile_line:
             phones.append({
-                'primary': True,
                 'type': 'work_mobile',
                 'value': local.mobile_line,
             })
         if local.fixed_line:
             phones.append({
-                'primary': False,
                 'type': 'work',
                 'value': local.fixed_line,
             })
@@ -75,16 +80,16 @@ class GSuiteUserAPI:
             {
                 'type': 'custom',
                 'customType': 'UUID',
-                'value': local.uuid,
+                'value': local.uids.uuid,
             },
             {
                 'type': 'custom',
                 'customType': 'hrid',
-                'value': local.hrid,
+                'value': local.uids.hrid,
             },
             {
                 'type': 'account',
-                'value': local.username,
+                'value': local.uids.username,
             },
         ]
 
@@ -92,36 +97,51 @@ class GSuiteUserAPI:
         emails = [
             {
                 'primary': True,
-                'type': 'work',
-                'address': local.mail,
+                'address': local.uids.email,
             },
         ]
 
-        new_remote = remote.copy()
+        new_remote = remote.copy() if remote else {}
         new_remote.update({
             # 'aliases': [],  # FIXME: Store in the directory
             'emails': emails,
             'externalIds': external_ids,
-            'id': remote_id,
             # 'hashFunction': 'MD5',  # FIXME: Use a password
             'name': {
                 'givenName': local.firstname,
                 'familyName': local.lastname,
+                'fullName': local.displayname,
             },
             # 'password': local.password,  # FIXME: Use a password
-            'phones': phones,
-            'primaryEmail': local.mail,
-            'suspended': now >= local.deactivation_date,
+            'phones': phones or None,
+            'primaryEmail': local.uids.email,
+            'suspended': local.deactivation_date is not None,
         })
-        return new_remote
+        delta = {
+            key: value
+            for key, value in new_remote.items()
+            if value != remote.get(key)
+        }
+        if delta:
+            return {
+                'prev': {key: remote.get(key) for key in delta},
+                'new': delta,
+            }
+        return delta
 
     def fetch(self):
-        pass
+        endpoint = self.client.users()
+        request = endpoint.list(domain='polyconseil.fr')
+        while request is not None:
+            response = request.execute()
+            yield from response['users']
+            request = endpoint.list_next(request, response)
 
     def all(self):
+        items = self.fetch()
         return {
-            self.to_folksync(obj): obj
-            for obj in self.fetch()
+            self.to_folksync_uids(obj): obj
+            for obj in items
         }
 
     def create_batch(self, changes):
@@ -134,29 +154,102 @@ class GSuiteUserAPI:
         pass
 
 
+class GSuiteGroupAPI:
+    def __init__(self, client):
+        self.client = client
+
+    @classmethod
+    def to_folksync_uids(cls, group):
+        """Extract UIDs from a GSuite user object."""
+        def get_entry(entries, **kwargs):
+            for entry in entries:
+                for key, value in kwargs.items():
+                    if entry.get(key) != value:
+                        break
+                return entry
+
+        return datastructs.GroupUID(
+            hrid=None,
+            uuid=None,
+            name=(group['name'] or group['email']).split('@')[0],
+        )
+
+    @classmethod
+    def merge(cls, remote, local):
+        if remote is None:
+            remote = {}
+
+        new_remote = remote.copy()
+        new_remote.update({
+            'description': local.description or '',
+            'email': '%s@%s' % (local.uids.name.lower(), 'polyconseil.fr'),
+        })
+        delta = {
+            key: value
+            for key, value in new_remote.items()
+            if value != remote.get(key)
+        }
+        if delta:
+            return {
+                'prev': {key: remote.get(key) for key in delta},
+                'new': delta,
+            }
+        return delta
+
+    def fetch(self):
+        endpoint = self.client.groups()
+        request = endpoint.list(domain='polyconseil.fr')
+        while request is not None:
+            response = request.execute()
+            yield from response['groups']
+            request = endpoint.list_next(request, response)
+
+    def all(self):
+        items = self.fetch()
+        return {
+            self.to_folksync_uids(obj): obj
+            for obj in items
+        }
+
+
 class GSuiteSink:
-    def __init__(self):
+    name = 'GSuite'
+
+    def __init__(self, config):
+        self.client_keyfile = config.getstr('gsuite.keyfile')
+        self.client_impersonate = config.getstr('gsuite.impersonate')
+        self.domain = config.getstr('gsuite.domain')
         self.client = None
         self.user_api = None
         self.group_api = None
 
+
+    def _setup_client(self):
+        credentials = oauth2client.service_account.ServiceAccountCredentials.from_json_keyfile_name(
+            self.client_keyfile,
+            SCOPES,
+        )
+        user_credentials = credentials.create_delegated(sub=self.client_impersonate)
+        authenticated_http = user_credentials.authorize(httplib2.Http())
+        return apiclient.discovery.build(
+            serviceName='admin',
+            version='directory_v1',
+            http=authenticated_http,
+        )
+
     def connect(self):
-        self.client = 42
+        self.client = self._setup_client()
         self.user_api = GSuiteUserAPI(self.client)
         self.group_api = GSuiteGroupAPI(self.client)
 
-    def fetch_users(self):
-        return self.user_api.all()
+    def fetch(self, kind):
+        if kind is datastructs.ObjectKind.ACCOUNT:
+            return self.user_api.all()
+        else:
+            return self.group_api.all()
 
-    def fetch_groups(self):
-        return self.group_api.all()
-
-    @classmethod
-    def map_user(cls, user):
-        """Convert a folksync User datastruct to a gsuite-style attr dict"""
-        pass
-
-    @classmethod
-    def map_group(cls, group):
-        """Convert a folksync Group datastruct to a gsuite-style attr dict"""
-        pass
+    def merger(self, kind):
+        if kind is datastructs.ObjectKind.ACCOUNT:
+            return self.user_api.merge
+        else:
+            return self.group_api.merge

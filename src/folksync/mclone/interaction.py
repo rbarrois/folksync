@@ -82,7 +82,7 @@ class BaseInteractor:
             "Sink %(sink)s: %(action)s %(items)" + width + "d items: " + state_map[event.step],
             dict(
                 action=event.action.name,
-                sink=run.sink,
+                sink=run.sink.name,
                 items=len(event.context.changes[event.action]),
             ),
         )
@@ -93,7 +93,7 @@ class BaseInteractor:
             self.printer.display(
                 "Sink %(sink)s: %(action)s: %(key)s %(delta)s",
                 dict(
-                    sink=run.sink,
+                    sink=run.sink.name,
                     action=event.action.name,
                     key=change.key,
                     delta=change.delta,

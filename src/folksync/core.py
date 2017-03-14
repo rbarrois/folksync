@@ -13,6 +13,7 @@ def load_source(name, config):
 
 class SinkRegistry(enum.Enum):
     null = 'folksync.sinks.NullSink'
+    gsuite = 'folksync.sinks.gsuite.GSuiteSink'
 
 
 def load_sink(name, config):

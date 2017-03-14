@@ -93,6 +93,20 @@ def replicate(source_data, remote_data, mapper, keys):
         )
 
 
+def apply_replicator(replicator, interact, act, run):
+    reply = None
+
+    try:
+        while True:
+            event = replicator.send(reply)
+            reply = interact(event, run)
+            act(event, run)
+
+    except StopIteration:
+        pass
+
+
+
 class Replicator:
     def __init__(self, source, sinks, interactor):
         self.source = source
@@ -126,15 +140,12 @@ class Replicator:
                 mode=mode,
             )
 
-            reply = None
-            try:
-                while True:
-                    event = sink_replication.send(reply)
-                    reply = self.interactor(event, run)
-                    self.maybe_act(event, run)
-
-            except StopIteration:
-                pass
+            apply_replicator(
+                replicator=sink_replication,
+                interact=self.interactor,
+                act=self.maybe_act,
+                run=run,
+            )
 
     def maybe_act(self, event, run):
         if event.step is not ReplicationStep.EXEC:

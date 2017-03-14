@@ -1,4 +1,4 @@
--e .[ldap]
+-e .[ldap,gsuite]
 -rrequirements_test.txt
 
 tox

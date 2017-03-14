@@ -21,21 +21,29 @@ class Type(enum.Enum):
     EXTERNAL = 'external'
 
 
+AccountUID = collections.namedtuple(
+    'AccountUID',
+    [
+        'hrid',  # source-side human readable ID; may change
+        'uuid',  # uuid; may not change
+        'username',  # ascii; may change
+        'email',  # ascii; may change
+    ],
+)
+
+
 Account = collections.namedtuple(
     'Account',
     [
-        'hrid',  # unique ID
-        'uuid',  # uuid
+        'uids',  # Unique IDs: an AccountUID record
         'creation_date',  # datetime
         'deactivation_date',  # datetime
 
         'type',  # Type
 
-        'username',  # Text
         'firstname',  # Text
         'lastname',  # Text
         'displayname',  # Text
-        'email',  # Ascii
         'fixed_line',  # Ascii
         'mobile_line',  # Ascii
 
@@ -44,18 +52,32 @@ Account = collections.namedtuple(
 )
 
 
+GroupUID = collections.namedtuple(
+    'GroupUID',
+    [
+        'hrid',  # source-side human readable ID; may change
+        'uuid',  # uuid; may not change
+        'name',  # ascii; may change
+    ],
+)
+
+
 Group = collections.namedtuple(
     'Group',
     [
-        'hrid',  # unique ID
-        'uuid',  # uuid
+        'uids',  # Unique IDs: a GroupUID record
         'creation_date',  # datetime
         'deactivation_date',  # datetime
 
-        'name',  # ascii
         'description',  # Text
 
         'owners',  # [uid]
         'members',  # [uid]
     ],
 )
+
+
+UID_FIELDS = {
+    ObjectKind.ACCOUNT: AccountUID._fields,
+    ObjectKind.GROUP: GroupUID._fields,
+}

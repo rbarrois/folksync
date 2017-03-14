@@ -56,6 +56,7 @@ setup(
     ],
     extras_require={
         'ldap': ['pyldap'],
+        'gsuite': ['google-api-python-client'],
     },
     setup_requires=[
         'setuptools>=1',

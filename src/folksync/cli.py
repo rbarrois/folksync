@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 import getconf
 
@@ -13,6 +14,10 @@ def main():
     parser.add_argument('--syslog', action='store_true', help="Log to syslog instead of stdout/stderr")
 
     opts = parser.parse_args()
+    if not opts.syslog:
+        root_logger = logging.getLogger()
+        root_logger.addHandler(logging.StreamHandler())
+        root_logger.setLevel(logging.INFO)
 
     config = getconf.ConfigGetter('folksync', [opts.config])
 

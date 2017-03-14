@@ -109,6 +109,12 @@ class OpenLdapSource:
         'mobile': Field(FieldType.TEXT),
     }
 
+    def fetch(self, kind):
+        if kind is datastructs.ObjectKind.ACCOUNT:
+            return self.fetch_users()
+        else:
+            return self.fetch_groups()
+
     def fetch_users(self):
         entries = self.source.fetch(
             fields=self.USER_FIELDS,
@@ -118,18 +124,20 @@ class OpenLdapSource:
 
         for dn, values in entries:
             yield datastructs.Account(
-                hrid=dn,
-                uuid=values['entryUUID'],
+                uids=datastructs.AccountUID(
+                    hrid=dn,
+                    uuid=values['entryUUID'],
+                    username=values['uid'],
+                    email=values['mail'],
+                ),
                 creation_date=values['createTimestamp'],
                 deactivation_date=values['shadowExpire'],
 
                 type=datastructs.Type.INTERNAL,
 
-                username=values['uid'],
                 firstname=values['givenName'],
                 lastname=values['sn'],
                 displayname=values['cn'],
-                email=values['mail'],
                 fixed_line=values['telephoneNumber'],
                 mobile_line=values['mobile'],
                 external_uids={},
@@ -153,11 +161,13 @@ class OpenLdapSource:
 
         for dn, values in entries:
             yield datastructs.Group(
-                hrid=dn,
-                uuid=values['entryUUID'],
+                uids=datastructs.GroupUID(
+                    hrid=dn,
+                    uuid=values['entryUUID'],
+                    name=values['cn'].lower(),
+                ),
                 creation_date=values['createTimestamp'],
                 deactivation_date=None,
-                name=values['cn'],
                 description=values['description'],
                 owners=values['owner'],
                 members=values['member'],
