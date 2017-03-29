@@ -26,15 +26,25 @@ def main():
         config=config,
     )
 
+    cache_name = config.getstr('core.cache', 'null')
+    cache = core.load_cache(
+        name=cache_name,
+        config=config,
+    )
+
     sink_names = config.getlist('core.sinks')
-    sinks = [core.load_sink(sink_name, config) for sink_name in sink_names]
+    sinks = [core.load_sink(sink_name, config, cache=cache) for sink_name in sink_names]
 
     syncer = sync.Syncer(
         source=source,
         sinks=sinks,
     )
 
-    syncer.run(dry_run=opts.dry_run)
+    try:
+        cache.open()
+        syncer.run(dry_run=opts.dry_run)
+    finally:
+        cache.commit()
 
 
 if __name__ == '__main__':

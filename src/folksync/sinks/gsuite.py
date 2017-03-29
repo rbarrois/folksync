@@ -251,7 +251,7 @@ class GSuiteGroupAPI:
 class GSuiteSink:
     name = 'GSuite'
 
-    def __init__(self, config):
+    def __init__(self, config, cache=None):
         self.client_keyfile = config.getstr('gsuite.keyfile')
         self.client_impersonate = config.getstr('gsuite.impersonate')
         self.domain = config.getstr('gsuite.domain')

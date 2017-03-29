@@ -57,6 +57,7 @@ setup(
     extras_require={
         'ldap': ['pyldap'],
         'gsuite': ['google-api-python-client'],
+        'trello': ['requests'],
     },
     setup_requires=[
         'setuptools>=1',
